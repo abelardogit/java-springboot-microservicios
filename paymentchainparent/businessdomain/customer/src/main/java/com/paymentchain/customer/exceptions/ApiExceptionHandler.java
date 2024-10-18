@@ -19,4 +19,11 @@ public class ApiExceptionHandler {
         StandarizedApiExceptionResponse saer = new StandarizedApiExceptionResponse("atype", "aTitle", "aCode", "aDetail");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(saer);
     }
+    
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<?> handleBusinessRuleException(BusinessRuleException aBusinessRuleException)
+    {
+        StandarizedApiExceptionResponse saer = new StandarizedApiExceptionResponse("BUSINESS", "Validation error: Products exist?", aBusinessRuleException.getCode(), aBusinessRuleException.getLocalizedMessage());
+        return ResponseEntity.status(aBusinessRuleException.getHttpStatus()).body(saer);
+    }
 }

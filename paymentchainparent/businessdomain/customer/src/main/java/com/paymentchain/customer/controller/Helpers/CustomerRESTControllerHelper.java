@@ -3,6 +3,7 @@ package com.paymentchain.customer.controller.Helpers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.paymentchain.customer.entities.Customer;
 import com.paymentchain.customer.entities.CustomerProduct;
+import com.paymentchain.customer.exceptions.BusinessRuleException;
 import com.paymentchain.customer.repository.CustomerRepository;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.epoll.EpollChannelOption;
@@ -10,15 +11,18 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -106,5 +110,28 @@ public class CustomerRESTControllerHelper {
         return transactionsOptional.orElse(Collections.emptyList());
     }
     
+    public static Customer ensureCustomerHasProductsOrFail(@RequestBody Customer aCustomer) throws BusinessRuleException {
+        List<CustomerProduct> customerProducts = aCustomer.getProducts();
+        boolean nonExistCustomerProducts = (null == customerProducts) || (customerProducts.isEmpty());
+        if (nonExistCustomerProducts) {
+            throw BusinessRuleException.fromCreate(1025, "No products were provided", HttpStatus.PRECONDITION_FAILED);
+        }
+        
+        Iterator<CustomerProduct> itCustomerProducts = aCustomer.getProducts().iterator();
+        boolean someCustomerProductsNonExist = false;
+        while(itCustomerProducts.hasNext() && !someCustomerProductsNonExist) {
+            CustomerProduct aCustomerProduct = itCustomerProducts.next();
+            someCustomerProductsNonExist = (null != aCustomerProduct);
+            if (!someCustomerProductsNonExist) {
+                aCustomerProduct.setCustomer(aCustomer);
+            }
+        }
+        
+        if (someCustomerProductsNonExist) {
+            throw BusinessRuleException.fromCreate(1026, "Some product was not provided", HttpStatus.PRECONDITION_FAILED);
+        }
+            
+        return customerRepository.save(aCustomer);
+    }
     
 }
