@@ -4,10 +4,19 @@
  */
 package com.paymentchain.customer.exceptions;
 
-/**
- *
- * @author abela
- */
+import com.paymentchain.customer.common.StandarizedApiExceptionResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
 public class ApiExceptionHandler {
     
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleUnknownHostException(Exception exc)
+    {
+        StandarizedApiExceptionResponse saer = new StandarizedApiExceptionResponse("atype", "aTitle", "aCode", "aDetail");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(saer);
+    }
 }
