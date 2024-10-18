@@ -22,6 +22,7 @@ import com.paymentchain.customer.entities.Customer;
 import com.paymentchain.customer.entities.CustomerProduct;
 import com.paymentchain.customer.exceptions.BusinessRuleException;
 import com.paymentchain.customer.repository.CustomerRepository;
+import java.net.UnknownHostException;
 import org.springframework.core.env.Environment;
 
 @RestController
@@ -123,7 +124,7 @@ public class CustomerRestController {
     }
     
     @GetMapping("/full")
-    public Customer getByCode(@RequestParam("code") String code) {
+    public Customer getByCode(@RequestParam("code") String code) throws UnknownHostException {
         return  CustomerRESTControllerHelper.getByCode(code);
     }
     
