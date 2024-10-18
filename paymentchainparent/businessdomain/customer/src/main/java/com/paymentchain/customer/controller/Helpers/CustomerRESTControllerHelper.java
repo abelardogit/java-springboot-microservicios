@@ -1,5 +1,13 @@
 package com.paymentchain.customer.controller.Helpers;
 
+import java.net.UnknownHostException;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.paymentchain.customer.entities.Customer;
 import com.paymentchain.customer.entities.CustomerProduct;
@@ -9,12 +17,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.epoll.EpollChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.netty.http.client.HttpClient;
 
 @Service
@@ -56,11 +59,16 @@ public class CustomerRESTControllerHelper {
         return customerRepository.findById(id); 
     }
     
-    public static Customer getByCode(@RequestParam("code") String code) {
+    public static Customer getByCode(@RequestParam("code") String code) throws UnknownHostException {
         Customer customerByCode = customerRepository.findByCode(code);
         List<CustomerProduct> customerProducts = customerByCode.getProducts();
         customerProducts.forEach(p -> {
-            String productName = getProductName(p.getId());
+            String productName;
+            try {
+                productName = getProductName(p.getId());
+            } catch(UnknownHostException uhex) {
+                productName = "";
+            }
             p.setProductName(productName);
         });
         /*
@@ -72,21 +80,29 @@ public class CustomerRESTControllerHelper {
 
     }
     
-    private static String getProductName(long id) {
-        ReactorClientHttpConnector reactorClientHttpConnector = new ReactorClientHttpConnector(client);
-        WebClient build = webClientBuilder.clientConnector(reactorClientHttpConnector)
-                .baseUrl(URL_PRODUCTS)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .defaultUriVariables(Collections.singletonMap("url", URL_PRODUCTS))
-        .build();
+    private static String getProductName(long id) throws UnknownHostException {
+        JsonNode productResponse;
+        try {
+            ReactorClientHttpConnector reactorClientHttpConnector = new ReactorClientHttpConnector(client);
+            WebClient build = webClientBuilder.clientConnector(reactorClientHttpConnector)
+                    .baseUrl(URL_PRODUCTS)
+                    .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .defaultUriVariables(Collections.singletonMap("url", URL_PRODUCTS))
+            .build();
         
-        JsonNode productResponse = build.method(HttpMethod.GET).uri("/" + id)
-                .retrieve().bodyToMono(JsonNode.class).block();
-        if (productResponse != null) {
-            return productResponse.get("name").asText();
+            productResponse = build.method(HttpMethod.GET).uri("/" + id)
+                   .retrieve().bodyToMono(JsonNode.class).block();
+            if (productResponse == null) {
+                throw new UnknownHostException("Response was not found!");
+            }
+        } catch (WebClientResponseException aWebClientResponseException) {
+            if (aWebClientResponseException.getStatusCode().equals(HttpStatus.NOT_FOUND)) {
+                return "";
+            }
+            throw new UnknownHostException(aWebClientResponseException.getLocalizedMessage());
         }
         
-        return "";
+        return productResponse.get("name").asText();
     }
     
     
@@ -114,7 +130,7 @@ public class CustomerRESTControllerHelper {
         List<CustomerProduct> customerProducts = aCustomer.getProducts();
         boolean nonExistCustomerProducts = (null == customerProducts) || (customerProducts.isEmpty());
         if (nonExistCustomerProducts) {
-            throw BusinessRuleException.fromCreate(1025, "No products were provided", HttpStatus.PRECONDITION_FAILED);
+            throw BusinessRuleException.fromCreate(1025, "No products were provided", "1025", HttpStatus.PRECONDITION_FAILED);
         }
         
         Iterator<CustomerProduct> itCustomerProducts = aCustomer.getProducts().iterator();
@@ -128,7 +144,7 @@ public class CustomerRESTControllerHelper {
         }
         
         if (someCustomerProductsNonExist) {
-            throw BusinessRuleException.fromCreate(1026, "Some product was not provided", HttpStatus.PRECONDITION_FAILED);
+            throw BusinessRuleException.fromCreate(1026, "Some product given no exist", "1026", HttpStatus.PRECONDITION_FAILED);
         }
             
         return customerRepository.save(aCustomer);
