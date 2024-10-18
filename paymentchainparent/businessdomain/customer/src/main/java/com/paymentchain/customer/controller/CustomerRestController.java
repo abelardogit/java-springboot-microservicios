@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.paymentchain.customer.controller.Helpers.CustomerRESTControllerHelper;
 import com.paymentchain.customer.entities.Customer;
 import com.paymentchain.customer.entities.CustomerProduct;
+import com.paymentchain.customer.exceptions.BusinessRuleException;
 import com.paymentchain.customer.repository.CustomerRepository;
 import org.springframework.core.env.Environment;
 
@@ -99,11 +100,16 @@ public class CustomerRestController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
     
+    /**
+     *
+     * @param aCustomer
+     * @return
+     * @throws com.paymentchain.customer.exceptions.BusinessRuleException
+     */
     @PostMapping
-    public ResponseEntity<?> post(@RequestBody Customer input) {
-        input.getProducts().forEach(p -> p.setCustomer(input));
-        Customer save = customerRepository.save(input);
-        return ResponseEntity.status(HttpStatus.CREATED).body(save);
+    public ResponseEntity<?> post(@RequestBody Customer aCustomer) throws BusinessRuleException {
+        Customer aCustomerWithProducts = CustomerRESTControllerHelper.ensureCustomerHasProductsOrFail(aCustomer);
+        return ResponseEntity.status(HttpStatus.CREATED).body(aCustomerWithProducts);
     }
     
     @DeleteMapping("/{id}")
